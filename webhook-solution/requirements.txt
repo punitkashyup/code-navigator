@@ -1,0 +1,12 @@
+opensearch-py==2.8.0
+langchain-aws==0.2.23
+langchain-community==0.3.21
+langchain-core==0.3.59
+langchain-openai==0.3.14
+pydantic==2.11.1
+urllib3==2.3.0
+python-dotenv==1.1.0
+requests==2.32.3
+httpx==0.28.1
+tree-sitter-language-pack==0.6.1
+google-genai==1.10.0

@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  WebhookLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: github-webhook-server
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      PackageType: Image
+      Environment:
+        Variables:
+          OPENSEARCH_URL: !Sub 'https://${OpenSearchDomainEndpoint}'
+          OPENSEARCH_ADMIN_PW: !Ref OpenSearchPassword
+          OPENSEARCH_USER: admin
+          OPENSEARCH_INDEX: test_index
+          OPENSEARCH_TEXT_FIELD: text
+          OPENSEARCH_VECTOR_FIELD: vector_field
+          OPENSEARCH_BULK_SIZE: 500
+          BEDROCK_MODEL_ID: amazon.titan-embed-text-v2:0
+          GITHUB_WEBHOOK_SECRET: !Ref GitHubWebhookSecret
+          GITHUB_TOKEN: !Ref GitHubToken
+          OPENAI_API_KEY: !Ref OpenAIApiKey
+          CHUNKER_MAX_CHARS: 1500
+          CHUNKER_COALESCE: 200
+          GENERATE_AI_DESCRIPTIONS: True
+          CHUNK_DESC_PROVIDER: openai
+      Code:
+        ImageUri: !Ref ImageUri
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: '*'
+        - PolicyName: OpenSearchAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - es:ESHttpGet
+                  - es:ESHttpPost
+                  - es:ESHttpPut
+                  - es:ESHttpDelete
+                Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/code-navigator/*'
+
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: GitHubWebhookAPI
+      Description: API for GitHub webhook integration
+
+  WebhookResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: webhook
+
+  WebhookMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref WebhookResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebhookLambdaFunction.Arn}/invocations
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: WebhookMethod
+    Properties:
+      RestApiId: !Ref ApiGateway
+      StageName: prod
+
+  LambdaApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WebhookLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/POST/webhook
+
+Parameters:
+  OpenSearchDomainEndpoint:
+    Type: String
+    Description: Endpoint for the OpenSearch domain
+  OpenSearchPassword:
+    Type: String
+    NoEcho: true
+    Description: Password for OpenSearch admin user
+  GitHubWebhookSecret:
+    Type: String
+    NoEcho: true
+  GitHubToken:
+    Type: String
+    NoEcho: true
+    Description: GitHub personal access token for API access
+    Default: ""
+  OpenAIApiKey:
+    Type: String
+    NoEcho: true
+    Description: OpenAI API key for generating descriptions
+    Default: ""
+    Description: Secret for GitHub webhook validation
+  ImageUri:
+    Type: String
+    Description: ECR Image URI for Lambda container image
+  # DeploymentBucket:
+  #   Type: String
+  #   Description: S3 bucket containing deployment package
+
+Outputs:
+  WebhookEndpoint:
+    Description: URL for GitHub webhook
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/webhook

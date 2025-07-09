@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: code-search-mcp
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    environment:
+      - OPENSEARCH_URL=${OPENSEARCH_URL:-http://opensearch:9200}
+      - OPENSEARCH_USER=${OPENSEARCH_USER:-admin}
+      - OPENSEARCH_ADMIN_PW=${OPENSEARCH_ADMIN_PW:-admin}
+      - OPENSEARCH_INDEX=${OPENSEARCH_INDEX:-ingested_code_index}
+      - OPENSEARCH_TEXT_FIELD=${OPENSEARCH_TEXT_FIELD:-text}
+      - OPENSEARCH_VECTOR_FIELD=${OPENSEARCH_VECTOR_FIELD:-vector_field}
+      - OPENSEARCH_TIMEOUT=${OPENSEARCH_TIMEOUT:-60}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-large}
+      - QUERY_EXPANSION_MODEL=${QUERY_EXPANSION_MODEL:-gpt-3.5-turbo}
+      - RERANKER_MODEL=${RERANKER_MODEL:-gpt-4o}
+      - QUERY_EXPANSION_N=${QUERY_EXPANSION_N:-3}
+      - RERANK_TOP_M=${RERANK_TOP_M:-5}
+      - BM25_K=${BM25_K:-5}
+      - VECTOR_SEARCH_K=${VECTOR_SEARCH_K:-5}
+      - MAX_CHUNKS=${MAX_CHUNKS:-100}
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-8080}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    # depends_on:
+    #   opensearch-init:
+    #     condition: service_completed_successfully
+    restart: unless-stopped
+#     networks:
+#       - opensearch-net
+
+#   opensearch:
+#     image: opensearchproject/opensearch:2.12.0
+#     container_name: opensearch-mcp
+#     environment:
+#       - cluster.name=opensearch-cluster
+#       - node.name=opensearch-node1
+#       - discovery.type=single-node
+#       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_ADMIN_PW:-admin}
+#       - plugins.security.disabled=true
+#       - action.auto_create_index=true
+#     volumes:
+#       - /Users/shivanksharma/Documents/PersonalGit/CodeNavigator/data:/usr/share/opensearch/data
+#     ports:
+#       - "${OPENSEARCH_PORT:-9200}:9200"
+#       - "9600:9600"
+#     networks:
+#       - opensearch-net
+#     healthcheck:
+#       test: ["CMD", "curl", "-f", "http://localhost:9200"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 10
+
+#   opensearch-init:
+#     build:
+#       context: .
+#       dockerfile: Dockerfile
+#     container_name: opensearch-init
+#     environment:
+#       - OPENSEARCH_URL=${OPENSEARCH_URL:-http://opensearch:9200}
+#       - OPENSEARCH_USER=${OPENSEARCH_USER:-admin}
+#       - OPENSEARCH_ADMIN_PW=${OPENSEARCH_ADMIN_PW:-admin}
+#       - OPENSEARCH_INDEX=${OPENSEARCH_INDEX:-ingested_code_index}
+#       - OPENSEARCH_TEXT_FIELD=${OPENSEARCH_TEXT_FIELD:-text}
+#       - OPENSEARCH_VECTOR_FIELD=${OPENSEARCH_VECTOR_FIELD:-vector_field}
+#     depends_on:
+#       opensearch:
+#         condition: service_healthy
+#     command: ["python", "scripts/init_opensearch.py"]
+#     networks:
+#       - opensearch-net
+
+# volumes:
+#   opensearch-data:
+#     driver: local
+
+# networks:
+#   opensearch-net:
+#     driver: bridge 

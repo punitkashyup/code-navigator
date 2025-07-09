@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(rm:*)",
+      "Bash(./create-backend.sh:*)",
+      "Bash(aws s3:*)",
+      "Bash(terraform init:*)",
+      "Bash(terraform workspace:*)",
+      "Bash(terraform plan:*)",
+      "Bash(terraform apply:*)",
+      "Bash(aws guardduty list-detectors:*)",
+      "Bash(terraform import:*)",
+      "Bash(terraform force-unlock:*)",
+      "Bash(aws opensearch list-domain-names:*)",
+      "Bash(terraform show:*)",
+      "Bash(terraform output:*)",
+      "Bash(./infra/build-and-deploy-lambda.sh:*)",
+      "Bash(./build-and-deploy-lambda.sh:*)"
+    ],
+    "deny": []
+  }
+}

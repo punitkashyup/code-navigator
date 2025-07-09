@@ -1,0 +1,215 @@
+#!/bin/bash
+set -e
+
+# Update system
+yum update -y
+
+# Install Docker
+yum install -y docker
+systemctl start docker
+systemctl enable docker
+usermod -a -G docker ec2-user
+
+# Install Docker Compose
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+
+# Install CloudWatch Agent
+yum install -y amazon-cloudwatch-agent
+
+# Install AWS CLI v2
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+./aws/install
+
+# Configure CloudWatch Agent
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOF'
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "cwagent"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/mcp-server.log",
+            "log_group_name": "/aws/ec2/${project_name}-mcp-server",
+            "log_stream_name": "{instance_id}/mcp-server.log"
+          },
+          {
+            "file_path": "/var/log/docker.log",
+            "log_group_name": "/aws/ec2/${project_name}-mcp-server",
+            "log_stream_name": "{instance_id}/docker.log"
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "namespace": "CodeNavigator/EC2",
+    "metrics_collected": {
+      "cpu": {
+        "measurement": [
+          "cpu_usage_idle",
+          "cpu_usage_iowait",
+          "cpu_usage_user",
+          "cpu_usage_system"
+        ],
+        "metrics_collection_interval": 60
+      },
+      "disk": {
+        "measurement": [
+          "used_percent"
+        ],
+        "metrics_collection_interval": 60,
+        "resources": [
+          "*"
+        ]
+      },
+      "diskio": {
+        "measurement": [
+          "io_time"
+        ],
+        "metrics_collection_interval": 60,
+        "resources": [
+          "*"
+        ]
+      },
+      "mem": {
+        "measurement": [
+          "mem_used_percent"
+        ],
+        "metrics_collection_interval": 60
+      }
+    }
+  }
+}
+EOF
+
+# Start CloudWatch Agent
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+
+# Create application directory
+mkdir -p /opt/mcp-server
+cd /opt/mcp-server
+
+# Create Docker Compose file
+cat > docker-compose.yml << 'EOF'
+version: '3.8'
+
+services:
+  mcp-server:
+    image: ${mcp_server_image}
+    container_name: mcp-server
+    ports:
+      - "${mcp_server_port}:${mcp_server_port}"
+    environment:
+      - OPENSEARCH_URL=https://${opensearch_endpoint}
+      - OPENSEARCH_ADMIN_PW=$${OPENSEARCH_ADMIN_PW}
+      - OPENSEARCH_USER=$${OPENSEARCH_USER}
+      - OPENSEARCH_INDEX=$${OPENSEARCH_INDEX}
+      - OPENSEARCH_TEXT_FIELD=$${OPENSEARCH_TEXT_FIELD}
+      - OPENSEARCH_VECTOR_FIELD=$${OPENSEARCH_VECTOR_FIELD}
+      - OPENSEARCH_BULK_SIZE=$${OPENSEARCH_BULK_SIZE}
+      - BEDROCK_MODEL_ID=$${BEDROCK_MODEL_ID}
+      - GITHUB_TOKEN=$${GITHUB_TOKEN}
+      - OPENAI_API_KEY=$${OPENAI_API_KEY}
+      - CHUNKER_MAX_CHARS=$${CHUNKER_MAX_CHARS}
+      - CHUNKER_COALESCE=$${CHUNKER_COALESCE}
+      - GENERATE_AI_DESCRIPTIONS=$${GENERATE_AI_DESCRIPTIONS}
+      - CHUNK_DESC_PROVIDER=$${CHUNK_DESC_PROVIDER}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${mcp_server_port}/mcp/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - /var/log/mcp-server.log:/var/log/mcp-server.log
+EOF
+
+# Create environment file (will be populated by user)
+cat > .env << 'EOF'
+# OpenSearch Configuration
+OPENSEARCH_ADMIN_PW=
+OPENSEARCH_USER=admin
+OPENSEARCH_INDEX=code_index
+OPENSEARCH_TEXT_FIELD=text
+OPENSEARCH_VECTOR_FIELD=vector_field
+OPENSEARCH_BULK_SIZE=500
+
+# AWS Bedrock Configuration
+BEDROCK_MODEL_ID=amazon.titan-embed-text-v2:0
+
+# GitHub Configuration
+GITHUB_TOKEN=
+
+# OpenAI Configuration
+OPENAI_API_KEY=
+
+# Chunker Configuration
+CHUNKER_MAX_CHARS=1500
+CHUNKER_COALESCE=200
+GENERATE_AI_DESCRIPTIONS=true
+CHUNK_DESC_PROVIDER=openai
+EOF
+
+# Create systemd service for MCP server
+cat > /etc/systemd/system/mcp-server.service << 'EOF'
+[Unit]
+Description=MCP Server
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/mcp-server
+ExecStart=/usr/local/bin/docker-compose up -d
+ExecStop=/usr/local/bin/docker-compose down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start the service
+systemctl daemon-reload
+systemctl enable mcp-server
+systemctl start mcp-server
+
+# Create log rotation for MCP server logs
+cat > /etc/logrotate.d/mcp-server << 'EOF'
+/var/log/mcp-server.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 root root
+    postrotate
+        /bin/kill -USR1 $(cat /var/run/mcp-server.pid 2>/dev/null) 2>/dev/null || true
+    endscript
+}
+EOF
+
+# Create a simple health check script
+cat > /opt/mcp-server/health-check.sh << 'EOF'
+#!/bin/bash
+curl -f http://localhost:${mcp_server_port}/mcp/health || exit 1
+EOF
+
+chmod +x /opt/mcp-server/health-check.sh
+
+# Signal that the instance is ready (placeholder for future ASG integration)
+echo "Instance setup completed successfully"
+
+echo "MCP Server setup completed successfully!"

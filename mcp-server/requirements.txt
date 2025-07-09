@@ -1,0 +1,13 @@
+mcp
+uvicorn
+opensearch-py
+python-dotenv
+langchain
+langchain-aws
+langchain-openai
+langchain-community
+boto3
+botocore
+requests-aws4auth
+tiktoken
+httpx
