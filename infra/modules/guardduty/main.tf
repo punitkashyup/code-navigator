@@ -1,18 +1,9 @@
-# GuardDuty Detector
-resource "aws_guardduty_detector" "main" {
-  enable = true
-  
-  # Manage minimal settings to avoid organization conflicts
-  finding_publishing_frequency = "FIFTEEN_MINUTES"
+# Data sources
+data "aws_caller_identity" "current" {}
 
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-guardduty-detector"
-  })
-  
-  # Ignore changes to avoid organization conflicts
-  lifecycle {
-    ignore_changes = [datasources, enable, finding_publishing_frequency]
-  }
+# GuardDuty Detector
+# Use data source instead of resource to reference existing detector
+data "aws_guardduty_detector" "main" {
 }
 
 # GuardDuty IPSet for trusted IPs (optional)
@@ -20,7 +11,7 @@ resource "aws_guardduty_ipset" "trusted_ips" {
   count = length(var.trusted_ip_list) > 0 ? 1 : 0
 
   activate    = true
-  detector_id = aws_guardduty_detector.main.id
+  detector_id = data.aws_guardduty_detector.main.id
   format      = "TXT"
   location    = aws_s3_object.trusted_ips[0].bucket
   name        = "${var.name_prefix}-trusted-ips"
@@ -85,7 +76,7 @@ resource "aws_guardduty_threatintelset" "threat_intel" {
   count = length(var.threat_intel_list) > 0 ? 1 : 0
 
   activate    = true
-  detector_id = aws_guardduty_detector.main.id
+  detector_id = data.aws_guardduty_detector.main.id
   format      = "TXT"
   location    = aws_s3_object.threat_intel[0].bucket
   name        = "${var.name_prefix}-threat-intel"
@@ -179,7 +170,7 @@ resource "aws_cloudwatch_log_metric_filter" "medium_severity_findings" {
 # GuardDuty Filter for excluding known false positives
 # Disabled due to organization restrictions
 # resource "aws_guardduty_filter" "exclude_false_positives" {
-#   detector_id = aws_guardduty_detector.main.id
+#   detector_id = data.aws_guardduty_detector.main.id
 #   name        = "${var.name_prefix}-exclude-false-positives"
 #   action      = "ARCHIVE"
 #   rank        = 1
@@ -202,7 +193,7 @@ resource "aws_guardduty_member" "members" {
   for_each = var.member_accounts
 
   account_id                 = each.value.account_id
-  detector_id               = aws_guardduty_detector.main.id
+  detector_id               = data.aws_guardduty_detector.main.id
   email                     = each.value.email
   invite                    = true
   invitation_message        = "Please accept GuardDuty invitation for ${var.name_prefix}"
@@ -214,7 +205,7 @@ resource "aws_guardduty_organization_configuration" "main" {
   count = var.enable_organization_configuration ? 1 : 0
 
   auto_enable_organization_members = "ALL"
-  detector_id = aws_guardduty_detector.main.id
+  detector_id = data.aws_guardduty_detector.main.id
 
   datasources {
     s3_logs {

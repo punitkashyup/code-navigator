@@ -125,3 +125,9 @@ variable "openai_api_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "auto_build_docker" {
+  description = "Whether to automatically build and push Docker image during deployment"
+  type        = bool
+  default     = false
+}

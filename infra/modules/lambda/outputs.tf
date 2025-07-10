@@ -1,16 +1,16 @@
 output "webhook_function_name" {
   description = "Name of the webhook Lambda function"
-  value       = aws_lambda_function.webhook.function_name
+  value       = length(aws_lambda_function.webhook) > 0 ? aws_lambda_function.webhook[0].function_name : null
 }
 
 output "webhook_function_arn" {
   description = "ARN of the webhook Lambda function"
-  value       = aws_lambda_function.webhook.arn
+  value       = length(aws_lambda_function.webhook) > 0 ? aws_lambda_function.webhook[0].arn : null
 }
 
 output "webhook_invoke_arn" {
   description = "Invoke ARN of the webhook Lambda function"
-  value       = aws_lambda_function.webhook.invoke_arn
+  value       = length(aws_lambda_function.webhook) > 0 ? aws_lambda_function.webhook[0].invoke_arn : null
 }
 
 output "api_gateway_url" {

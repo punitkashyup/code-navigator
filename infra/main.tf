@@ -36,6 +36,9 @@ locals {
   }
   
   name_prefix = "${var.project_name}-${terraform.workspace}"
+  
+  # Control Lambda integration - enable when auto_build_docker is true
+  enable_lambda_integration = var.auto_build_docker
 }
 
 # VPC and Networking
@@ -94,6 +97,7 @@ module "alb" {
   # Target groups
   mcp_server_target_group_arn = module.ec2.target_group_arn
   webhook_lambda_arn         = module.lambda.webhook_function_arn
+  enable_lambda_integration  = local.enable_lambda_integration
   
   # SSL/TLS
   domain_name        = var.domain_name
@@ -118,6 +122,9 @@ module "lambda" {
   github_webhook_secret = var.github_webhook_secret
   github_token         = var.github_token
   openai_api_key      = var.openai_api_key
+  
+  # Docker build automation
+  auto_build_docker = var.auto_build_docker
   
   tags = local.common_tags
 }

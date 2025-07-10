@@ -16,7 +16,15 @@
       "Bash(terraform show:*)",
       "Bash(terraform output:*)",
       "Bash(./infra/build-and-deploy-lambda.sh:*)",
-      "Bash(./build-and-deploy-lambda.sh:*)"
+      "Bash(./build-and-deploy-lambda.sh:*)",
+      "Bash(aws ec2 describe-instances:*)",
+      "Bash(aws lambda list-functions:*)",
+      "Bash(aws ssm:*)",
+      "Bash(aws ec2 describe-network-interfaces:*)",
+      "Bash(aws:*)",
+      "Bash(terraform state rm:*)",
+      "Bash(terraform state:*)",
+      "Bash(terraform destroy:*)"
     ],
     "deny": []
   }

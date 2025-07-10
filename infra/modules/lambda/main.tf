@@ -2,6 +2,7 @@
 resource "aws_ecr_repository" "lambda_webhook" {
   name                 = "${var.name_prefix}-webhook-lambda"
   image_tag_mutability = "MUTABLE"
+  force_delete         = true  # Allow deletion even with images
 
   image_scanning_configuration {
     scan_on_push = true
@@ -164,8 +165,58 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc_policy" {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
+# Local to check if ECR image exists
+locals {
+  # Use a simple count based on auto_build_docker setting
+  # When auto_build_docker is true, we assume image will be available after build
+  lambda_count = var.auto_build_docker ? 1 : 0
+}
+
+# Null resource to automatically build and push Docker image
+resource "null_resource" "docker_build_push" {
+  count = var.auto_build_docker ? 1 : 0
+  
+  triggers = {
+    # Rebuild when Dockerfile or source code changes
+    dockerfile_hash = fileexists("../../webhook-solution/Dockerfile") ? filemd5("../../webhook-solution/Dockerfile") : "no-dockerfile"
+    ecr_repo_url    = aws_ecr_repository.lambda_webhook.repository_url
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Building and pushing Docker image..."
+      cd ../../webhook-solution
+      
+      # Check if Dockerfile exists
+      if [ ! -f "Dockerfile" ]; then
+        echo "Warning: Dockerfile not found in webhook-solution directory"
+        exit 0
+      fi
+      
+      # Authenticate Docker to ECR
+      aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${aws_ecr_repository.lambda_webhook.repository_url}
+      
+      # Build and push the image
+      docker build -t webhook-lambda .
+      docker tag webhook-lambda:latest ${aws_ecr_repository.lambda_webhook.repository_url}:latest
+      docker push ${aws_ecr_repository.lambda_webhook.repository_url}:latest
+      
+      echo "Docker image built and pushed successfully!"
+    EOT
+  }
+
+  depends_on = [aws_ecr_repository.lambda_webhook]
+}
+
+# Note: We rely on the null_resource to build and push the Docker image
+# before the Lambda function is created when auto_build_docker is enabled
+
 # Lambda Function with container image
+# Note: This requires the Docker image to be built and pushed to ECR first
+# Run the build-and-deploy-lambda.sh script after initial deployment
 resource "aws_lambda_function" "webhook" {
+  count = local.lambda_count  # Automatically enable when auto_build_docker is true
+  
   function_name = "${var.name_prefix}-webhook-handler"
   role         = aws_iam_role.lambda_role.arn
   package_type = "Image"
@@ -207,13 +258,16 @@ resource "aws_lambda_function" "webhook" {
     Name = "${var.name_prefix}-webhook-handler"
   })
 
-  # Wait for the ECR repository to be created
-  depends_on = [aws_ecr_repository.lambda_webhook]
+  # Wait for the ECR repository and Docker image to be created
+  depends_on = [
+    aws_ecr_repository.lambda_webhook,
+    null_resource.docker_build_push
+  ]
 }
 
 # CloudWatch Log Group for Lambda
 resource "aws_cloudwatch_log_group" "lambda_logs" {
-  name              = "/aws/lambda/${aws_lambda_function.webhook.function_name}"
+  name              = "/aws/lambda/${length(aws_lambda_function.webhook) > 0 ? aws_lambda_function.webhook[0].function_name : "${var.name_prefix}-webhook-handler"}"
   retention_in_days = 7
 
   tags = var.tags
@@ -256,13 +310,53 @@ resource "aws_api_gateway_method" "webhook_options" {
 
 # API Gateway Integration
 resource "aws_api_gateway_integration" "webhook_post" {
+  count = length(aws_lambda_function.webhook) > 0 ? 1 : 0
+  
   rest_api_id = aws_api_gateway_rest_api.webhook.id
   resource_id = aws_api_gateway_resource.webhook.id
   http_method = aws_api_gateway_method.webhook_post.http_method
 
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.webhook.invoke_arn
+  uri                     = aws_lambda_function.webhook[0].invoke_arn
+}
+
+# Mock API Gateway Integration for webhook POST when Lambda doesn't exist
+resource "aws_api_gateway_integration" "webhook_post_mock" {
+  count = length(aws_lambda_function.webhook) == 0 ? 1 : 0
+  
+  rest_api_id = aws_api_gateway_rest_api.webhook.id
+  resource_id = aws_api_gateway_resource.webhook.id
+  http_method = aws_api_gateway_method.webhook_post.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 503
+    })
+  }
+}
+
+# Mock Integration Response for webhook POST
+resource "aws_api_gateway_integration_response" "webhook_post_mock" {
+  count = length(aws_lambda_function.webhook) == 0 ? 1 : 0
+  
+  rest_api_id = aws_api_gateway_rest_api.webhook.id
+  resource_id = aws_api_gateway_resource.webhook.id
+  http_method = aws_api_gateway_method.webhook_post.http_method
+  status_code = "503"
+
+  depends_on = [aws_api_gateway_integration.webhook_post_mock]
+}
+
+# Method Response for webhook POST 503
+resource "aws_api_gateway_method_response" "webhook_post_503" {
+  count = length(aws_lambda_function.webhook) == 0 ? 1 : 0
+  
+  rest_api_id = aws_api_gateway_rest_api.webhook.id
+  resource_id = aws_api_gateway_resource.webhook.id
+  http_method = aws_api_gateway_method.webhook_post.http_method
+  status_code = "503"
 }
 
 # API Gateway Integration for OPTIONS
@@ -309,6 +403,8 @@ resource "aws_api_gateway_method_response" "webhook_options" {
 
 # API Gateway Integration Response
 resource "aws_api_gateway_integration_response" "webhook_post" {
+  count = length(aws_lambda_function.webhook) > 0 ? 1 : 0
+  
   rest_api_id = aws_api_gateway_rest_api.webhook.id
   resource_id = aws_api_gateway_resource.webhook.id
   http_method = aws_api_gateway_method.webhook_post.http_method
@@ -343,19 +439,39 @@ resource "aws_api_gateway_integration_response" "webhook_options" {
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "webhook" {
   depends_on = [
+    aws_api_gateway_integration.webhook_options,
     aws_api_gateway_integration.webhook_post,
-    aws_api_gateway_integration.webhook_options
+    aws_api_gateway_integration.webhook_post_mock,
+    aws_api_gateway_integration.health_get,
+    aws_api_gateway_integration.health_get_mock,
+    aws_api_gateway_method.webhook_post,
+    aws_api_gateway_method.webhook_options,
+    aws_api_gateway_method.health_get
   ]
 
   rest_api_id = aws_api_gateway_rest_api.webhook.id
-  stage_name  = "prod"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# API Gateway Stage
+resource "aws_api_gateway_stage" "webhook" {
+  deployment_id = aws_api_gateway_deployment.webhook.id
+  rest_api_id   = aws_api_gateway_rest_api.webhook.id
+  stage_name    = "prod"
+
+  tags = var.tags
 }
 
 # Lambda Permission for API Gateway
 resource "aws_lambda_permission" "api_gateway_invoke" {
+  count = length(aws_lambda_function.webhook) > 0 ? 1 : 0
+  
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.webhook.function_name
+  function_name = aws_lambda_function.webhook[0].function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.webhook.execution_arn}/*/*"
 }
@@ -377,11 +493,51 @@ resource "aws_api_gateway_method" "health_get" {
 
 # Health Check Integration
 resource "aws_api_gateway_integration" "health_get" {
+  count = length(aws_lambda_function.webhook) > 0 ? 1 : 0
+  
   rest_api_id = aws_api_gateway_rest_api.webhook.id
   resource_id = aws_api_gateway_resource.health.id
   http_method = aws_api_gateway_method.health_get.http_method
 
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.webhook.invoke_arn
+  uri                     = aws_lambda_function.webhook[0].invoke_arn
+}
+
+# Mock Health Check Integration when Lambda doesn't exist
+resource "aws_api_gateway_integration" "health_get_mock" {
+  count = length(aws_lambda_function.webhook) == 0 ? 1 : 0
+  
+  rest_api_id = aws_api_gateway_rest_api.webhook.id
+  resource_id = aws_api_gateway_resource.health.id
+  http_method = aws_api_gateway_method.health_get.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 503
+    })
+  }
+}
+
+# Mock Integration Response for health GET
+resource "aws_api_gateway_integration_response" "health_get_mock" {
+  count = length(aws_lambda_function.webhook) == 0 ? 1 : 0
+  
+  rest_api_id = aws_api_gateway_rest_api.webhook.id
+  resource_id = aws_api_gateway_resource.health.id
+  http_method = aws_api_gateway_method.health_get.http_method
+  status_code = "503"
+
+  depends_on = [aws_api_gateway_integration.health_get_mock]
+}
+
+# Method Response for health GET 503
+resource "aws_api_gateway_method_response" "health_get_503" {
+  count = length(aws_lambda_function.webhook) == 0 ? 1 : 0
+  
+  rest_api_id = aws_api_gateway_rest_api.webhook.id
+  resource_id = aws_api_gateway_resource.health.id
+  http_method = aws_api_gateway_method.health_get.http_method
+  status_code = "503"
 }

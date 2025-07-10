@@ -1,16 +1,16 @@
 output "detector_id" {
   description = "ID of the GuardDuty detector"
-  value       = aws_guardduty_detector.main.id
+  value       = data.aws_guardduty_detector.main.id
 }
 
 output "detector_arn" {
   description = "ARN of the GuardDuty detector"
-  value       = aws_guardduty_detector.main.arn
+  value       = data.aws_guardduty_detector.main.arn
 }
 
 output "account_id" {
   description = "AWS account ID where GuardDuty is enabled"
-  value       = aws_guardduty_detector.main.account_id
+  value       = data.aws_caller_identity.current.account_id
 }
 
 output "log_group_name" {

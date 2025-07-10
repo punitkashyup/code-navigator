@@ -26,6 +26,13 @@ variable "mcp_server_target_group_arn" {
 variable "webhook_lambda_arn" {
   description = "ARN of the webhook Lambda function"
   type        = string
+  default     = null
+}
+
+variable "enable_lambda_integration" {
+  description = "Whether to enable Lambda integration for ALB"
+  type        = bool
+  default     = false
 }
 
 variable "domain_name" {

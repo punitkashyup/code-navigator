@@ -114,6 +114,8 @@ resource "aws_lb_target_group" "webhook" {
 
 # Lambda Target Group Attachment
 resource "aws_lb_target_group_attachment" "webhook" {
+  count = var.enable_lambda_integration ? 1 : 0
+  
   target_group_arn = aws_lb_target_group.webhook.arn
   target_id        = var.webhook_lambda_arn
   depends_on       = [aws_lambda_permission.alb_invoke]
@@ -121,6 +123,8 @@ resource "aws_lb_target_group_attachment" "webhook" {
 
 # Lambda Permission for ALB
 resource "aws_lambda_permission" "alb_invoke" {
+  count = var.enable_lambda_integration ? 1 : 0
+  
   statement_id  = "AllowExecutionFromALB"
   action        = "lambda:InvokeFunction"
   function_name = var.webhook_lambda_arn
