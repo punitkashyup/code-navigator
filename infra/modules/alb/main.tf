@@ -104,7 +104,7 @@ resource "aws_lb_listener_rule" "mcp_server_http" {
 
 # Lambda Target Group for Webhook
 resource "aws_lb_target_group" "webhook" {
-  name        = "${var.name_prefix}-webhook-tg"
+  name        = "${var.name_prefix}-webhook"
   target_type = "lambda"
 
   tags = merge(var.tags, {

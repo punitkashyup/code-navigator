@@ -66,3 +66,9 @@ variable "auto_build_docker" {
   type        = bool
   default     = false
 }
+
+variable "enable_lambda_creation" {
+  description = "Whether to create the Lambda function (use false for first deployment, true after Docker image is built)"
+  type        = bool
+  default     = false
+}

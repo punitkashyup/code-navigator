@@ -144,7 +144,7 @@ resource "aws_instance" "mcp_server" {
 
 # Application Load Balancer Target Group
 resource "aws_lb_target_group" "mcp_server" {
-  name     = "${var.name_prefix}-mcp-server-tg"
+  name     = "${var.name_prefix}-mcp-tg"
   port     = var.mcp_server_port
   protocol = "HTTP"
   vpc_id   = var.vpc_id

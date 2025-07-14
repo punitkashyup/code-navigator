@@ -24,7 +24,8 @@
       "Bash(aws:*)",
       "Bash(terraform state rm:*)",
       "Bash(terraform state:*)",
-      "Bash(terraform destroy:*)"
+      "Bash(terraform destroy:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

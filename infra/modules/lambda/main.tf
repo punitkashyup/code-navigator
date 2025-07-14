@@ -165,11 +165,10 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc_policy" {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# Local to check if ECR image exists
+# Local to control Lambda function creation
 locals {
-  # Use a simple count based on auto_build_docker setting
-  # When auto_build_docker is true, we assume image will be available after build
-  lambda_count = var.auto_build_docker ? 1 : 0
+  # Simple count based on enable_lambda_creation flag
+  lambda_count = var.enable_lambda_creation ? 1 : 0
 }
 
 # Null resource to automatically build and push Docker image
@@ -178,14 +177,14 @@ resource "null_resource" "docker_build_push" {
   
   triggers = {
     # Rebuild when Dockerfile or source code changes
-    dockerfile_hash = fileexists("../../webhook-solution/Dockerfile") ? filemd5("../../webhook-solution/Dockerfile") : "no-dockerfile"
+    dockerfile_hash = fileexists("../webhook-solution/Dockerfile") ? filemd5("../webhook-solution/Dockerfile") : "no-dockerfile"
     ecr_repo_url    = aws_ecr_repository.lambda_webhook.repository_url
   }
 
   provisioner "local-exec" {
     command = <<-EOT
       echo "Building and pushing Docker image..."
-      cd ../../webhook-solution
+      cd ../webhook-solution
       
       # Check if Dockerfile exists
       if [ ! -f "Dockerfile" ]; then
@@ -208,8 +207,8 @@ resource "null_resource" "docker_build_push" {
   depends_on = [aws_ecr_repository.lambda_webhook]
 }
 
-# Note: We rely on the null_resource to build and push the Docker image
-# before the Lambda function is created when auto_build_docker is enabled
+# Note: Lambda function creation is controlled by enable_lambda_creation variable
+# This allows for two-stage deployment: first build Docker image, then create Lambda
 
 # Lambda Function with container image
 # Note: This requires the Docker image to be built and pushed to ECR first

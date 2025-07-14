@@ -37,8 +37,8 @@ locals {
   
   name_prefix = "${var.project_name}-${terraform.workspace}"
   
-  # Control Lambda integration - enable when auto_build_docker is true
-  enable_lambda_integration = var.auto_build_docker
+  # Control Lambda integration - enable when Lambda function is created
+  enable_lambda_integration = var.enable_lambda_creation
 }
 
 # VPC and Networking
@@ -125,6 +125,7 @@ module "lambda" {
   
   # Docker build automation
   auto_build_docker = var.auto_build_docker
+  enable_lambda_creation = var.enable_lambda_creation
   
   tags = local.common_tags
 }
