@@ -56,7 +56,7 @@ resource "aws_opensearch_domain" "main" {
     }
   }
 
-  # Access policy
+  # Access policy - permissive for VPC access with fine-grained access control
   access_policies = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -66,7 +66,7 @@ resource "aws_opensearch_domain" "main" {
           AWS = "*"
         }
         Action   = "es:*"
-        Resource = "arn:aws:es:*:*:domain/${var.name_prefix}-opensearch/*"
+        Resource = "arn:aws:es:*:*:domain/${var.name_prefix}-os/*"
       }
     ]
   })
@@ -177,13 +177,7 @@ resource "aws_opensearch_domain_policy" "main" {
         Principal = {
           AWS = "*"
         }
-        Action = [
-          "es:ESHttpGet",
-          "es:ESHttpPost",
-          "es:ESHttpPut",
-          "es:ESHttpDelete",
-          "es:ESHttpHead"
-        ]
+        Action = "es:*"
         Resource = "${aws_opensearch_domain.main.arn}/*"
       }
     ]
