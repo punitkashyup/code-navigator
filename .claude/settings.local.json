@@ -29,7 +29,8 @@
       "Bash(grep:*)",
       "Bash(mv:*)",
       "Bash(sed:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(./deploy.sh)"
     ],
     "deny": []
   }

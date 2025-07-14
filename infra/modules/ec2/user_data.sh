@@ -94,7 +94,18 @@ EOF
 # Authenticate Docker to ECR if using ECR image
 if [[ "${mcp_server_image}" == *".dkr.ecr."* ]]; then
     echo "Authenticating Docker to ECR for ${mcp_server_image}..."
-    aws ecr get-login-password --region ${aws_region} | docker login --username AWS --password-stdin ${aws_account_id}.dkr.ecr.${aws_region}.amazonaws.com
+    # Extract ECR registry URL from image URI
+    ECR_REGISTRY=$(echo "${mcp_server_image}" | cut -d'/' -f1)
+    aws ecr get-login-password --region ${aws_region} | docker login --username AWS --password-stdin $ECR_REGISTRY
+    
+    # Verify authentication worked by trying to pull the image
+    echo "Testing ECR authentication by pulling image..."
+    docker pull ${mcp_server_image} || {
+        echo "Failed to pull image from ECR. Retrying authentication..."
+        sleep 5
+        aws ecr get-login-password --region ${aws_region} | docker login --username AWS --password-stdin $ECR_REGISTRY
+        docker pull ${mcp_server_image}
+    }
 fi
 
 # Create application directory
@@ -103,8 +114,6 @@ cd /opt/mcp-server
 
 # Create Docker Compose file
 cat > docker-compose.yml << 'EOF'
-version: '3.8'
-
 services:
   mcp-server:
     image: ${mcp_server_image}
@@ -178,9 +187,12 @@ After=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/mcp-server
+ExecStartPre=/bin/bash -c 'if [[ "${mcp_server_image}" == *".dkr.ecr."* ]]; then ECR_REGISTRY=$(echo "${mcp_server_image}" | cut -d/ -f1); aws ecr get-login-password --region ${aws_region} | docker login --username AWS --password-stdin $ECR_REGISTRY; fi'
 ExecStart=/usr/local/bin/docker-compose up -d
 ExecStop=/usr/local/bin/docker-compose down
-TimeoutStartSec=0
+TimeoutStartSec=300
+Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -190,6 +202,26 @@ EOF
 systemctl daemon-reload
 systemctl enable mcp-server
 systemctl start mcp-server
+
+# Start the service with retry logic
+echo "Starting MCP server service..."
+for i in {1..3}; do
+    if systemctl start mcp-server; then
+        echo "MCP server service started successfully"
+        break
+    else
+        echo "Attempt $i failed, retrying in 10 seconds..."
+        sleep 10
+        # Re-authenticate to ECR before retry
+        if [[ "${mcp_server_image}" == *".dkr.ecr."* ]]; then
+            ECR_REGISTRY=$(echo "${mcp_server_image}" | cut -d'/' -f1)
+            aws ecr get-login-password --region ${aws_region} | docker login --username AWS --password-stdin $ECR_REGISTRY
+        fi
+    fi
+done
+
+# Check service status
+systemctl status mcp-server --no-pager
 
 # Create log rotation for MCP server logs
 cat > /etc/logrotate.d/mcp-server << 'EOF'

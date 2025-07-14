@@ -29,15 +29,15 @@ done
 echo -e "${YELLOW}Step 1: Initializing Terraform...${NC}"
 terraform init -backend-config=backend-config/dev.hcl -reconfigure
 
-echo -e "${YELLOW}Step 2: Deploying infrastructure (without Lambda)...${NC}"
-terraform apply -var-file=environments/dev.tfvars -var="auto_build_docker=true" -var="enable_lambda_creation=false" -auto-approve
+echo -e "${YELLOW}Step 2: Creating ECR repositories first...${NC}"
+terraform apply -var-file=environments/dev.tfvars -var="auto_build_docker=false" -var="enable_lambda_creation=false" -target=module.lambda.aws_ecr_repository.lambda_webhook -target=module.ec2.aws_ecr_repository.mcp_server -auto-approve
 
 if [ $? -ne 0 ]; then
-    echo -e "${RED}Error: Infrastructure deployment failed${NC}"
+    echo -e "${RED}Error: ECR repository creation failed${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✓ Infrastructure deployed successfully${NC}"
+echo -e "${GREEN}✓ ECR repositories created successfully${NC}"
 
 # Get the ECR repository URL from Terraform output
 echo -e "${YELLOW}Step 3: Building and pushing Docker images...${NC}"
@@ -89,11 +89,41 @@ fi
 
 echo -e "${GREEN}✓ All Docker images processed successfully${NC}"
 
-# Wait a moment for ECR to register the image
-echo -e "${YELLOW}Waiting for ECR to register the image...${NC}"
+# Wait a moment for ECR to register the images
+echo -e "${YELLOW}Waiting for ECR to register the images...${NC}"
 sleep 10
 
-echo -e "${YELLOW}Step 4: Enabling Lambda function...${NC}"
+echo -e "${YELLOW}Step 4: Deploying complete infrastructure...${NC}"
+terraform apply -var-file=environments/dev.tfvars -var="auto_build_docker=true" -var="enable_lambda_creation=false" -auto-approve
+
+# Wait for EC2 instance to fully initialize and start MCP server
+echo -e "${YELLOW}Waiting for EC2 instance to initialize and start MCP server...${NC}"
+sleep 30
+
+# Get the EC2 instance IP to check if MCP server is running
+EC2_IP=$(terraform output -raw ec2_public_ip 2>/dev/null || echo "")
+MCP_PORT=$(grep -E '^mcp_server_port' environments/dev.tfvars | cut -d'=' -f2 | tr -d ' ')
+if [ ! -z "$EC2_IP" ] && [ ! -z "$MCP_PORT" ]; then
+    echo -e "${YELLOW}Checking MCP server health at $EC2_IP:$MCP_PORT...${NC}"
+    for i in {1..10}; do
+        if curl -f "http://$EC2_IP:$MCP_PORT/mcp/health" 2>/dev/null; then
+            echo -e "${GREEN}✓ MCP server is healthy${NC}"
+            break
+        else
+            echo "Waiting for MCP server to start... (attempt $i/10)"
+            sleep 15
+        fi
+    done
+fi
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Error: Infrastructure deployment failed${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Infrastructure deployed successfully${NC}"
+
+echo -e "${YELLOW}Step 5: Enabling Lambda function...${NC}"
 terraform apply -var-file=environments/dev.tfvars -var="auto_build_docker=true" -var="enable_lambda_creation=true" -auto-approve
 
 if [ $? -ne 0 ]; then
