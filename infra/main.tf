@@ -82,6 +82,14 @@ module "ec2" {
   # Docker build automation
   auto_build_docker = var.auto_build_docker
   
+  # Environment variables for MCP server
+  opensearch_master_user     = var.opensearch_master_user
+  opensearch_master_password = var.opensearch_master_password
+  github_token               = var.github_token
+  openai_api_key             = var.openai_api_key
+  aws_region                 = data.aws_region.current.name
+  aws_account_id             = data.aws_caller_identity.current.account_id
+  
   tags = local.common_tags
 }
 

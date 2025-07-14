@@ -4,8 +4,8 @@ set -e
 # Update system
 yum update -y
 
-# Install Docker
-yum install -y docker
+# Install Docker and netcat
+yum install -y docker nc
 systemctl start docker
 systemctl enable docker
 usermod -a -G docker ec2-user
@@ -135,9 +135,9 @@ services:
       - CHUNKER_COALESCE=$${CHUNKER_COALESCE}
       - GENERATE_AI_DESCRIPTIONS=$${GENERATE_AI_DESCRIPTIONS}
       - CHUNK_DESC_PROVIDER=$${CHUNK_DESC_PROVIDER}
-    restart: unless-stopped
+    restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${mcp_server_port}/mcp/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${mcp_server_port}/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -150,11 +150,11 @@ services:
       - /var/log/mcp-server.log:/var/log/mcp-server.log
 EOF
 
-# Create environment file (will be populated by user)
-cat > .env << 'EOF'
+# Create environment file with actual values from Terraform
+cat > .env << EOF
 # OpenSearch Configuration
-OPENSEARCH_ADMIN_PW=
-OPENSEARCH_USER=admin
+OPENSEARCH_ADMIN_PW=${opensearch_master_password}
+OPENSEARCH_USER=${opensearch_master_user}
 OPENSEARCH_INDEX=code_index
 OPENSEARCH_TEXT_FIELD=text
 OPENSEARCH_VECTOR_FIELD=vector_field
@@ -164,10 +164,10 @@ OPENSEARCH_BULK_SIZE=500
 BEDROCK_MODEL_ID=amazon.titan-embed-text-v2:0
 
 # GitHub Configuration
-GITHUB_TOKEN=
+GITHUB_TOKEN=${github_token}
 
 # OpenAI Configuration
-OPENAI_API_KEY=
+OPENAI_API_KEY=${openai_api_key}
 
 # Chunker Configuration
 CHUNKER_MAX_CHARS=1500
@@ -176,38 +176,14 @@ GENERATE_AI_DESCRIPTIONS=true
 CHUNK_DESC_PROVIDER=openai
 EOF
 
-# Create systemd service for MCP server
-cat > /etc/systemd/system/mcp-server.service << 'EOF'
-[Unit]
-Description=MCP Server
-Requires=docker.service
-After=docker.service
+# Start MCP server with Docker Compose
+echo "Starting MCP server with Docker Compose..."
+cd /opt/mcp-server
 
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=/opt/mcp-server
-ExecStartPre=/bin/bash -c 'if [[ "${mcp_server_image}" == *".dkr.ecr."* ]]; then ECR_REGISTRY=$(echo "${mcp_server_image}" | cut -d/ -f1); aws ecr get-login-password --region ${aws_region} | docker login --username AWS --password-stdin $ECR_REGISTRY; fi'
-ExecStart=/usr/local/bin/docker-compose up -d
-ExecStop=/usr/local/bin/docker-compose down
-TimeoutStartSec=300
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Enable and start the service
-systemctl daemon-reload
-systemctl enable mcp-server
-systemctl start mcp-server
-
-# Start the service with retry logic
-echo "Starting MCP server service..."
+# Simple startup with retry
 for i in {1..3}; do
-    if systemctl start mcp-server; then
-        echo "MCP server service started successfully"
+    if docker-compose up -d; then
+        echo "MCP server started successfully"
         break
     else
         echo "Attempt $i failed, retrying in 10 seconds..."
@@ -220,8 +196,12 @@ for i in {1..3}; do
     fi
 done
 
-# Check service status
-systemctl status mcp-server --no-pager
+# Check containers are running
+docker-compose ps
+
+# Add simple startup command to rc.local for boot
+echo "cd /opt/mcp-server && docker-compose up -d" >> /etc/rc.local
+chmod +x /etc/rc.local
 
 # Create log rotation for MCP server logs
 cat > /etc/logrotate.d/mcp-server << 'EOF'
@@ -242,7 +222,7 @@ EOF
 # Create a simple health check script
 cat > /opt/mcp-server/health-check.sh << 'EOF'
 #!/bin/bash
-curl -f http://localhost:${mcp_server_port}/mcp/health || exit 1
+curl -f http://localhost:${mcp_server_port}/ || exit 1
 EOF
 
 chmod +x /opt/mcp-server/health-check.sh

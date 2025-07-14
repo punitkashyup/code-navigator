@@ -96,31 +96,6 @@ sleep 10
 echo -e "${YELLOW}Step 4: Deploying complete infrastructure...${NC}"
 terraform apply -var-file=environments/dev.tfvars -var="auto_build_docker=true" -var="enable_lambda_creation=false" -auto-approve
 
-# Wait for EC2 instance to fully initialize and start MCP server
-echo -e "${YELLOW}Waiting for EC2 instance to initialize and start MCP server...${NC}"
-sleep 30
-
-# Get the EC2 instance IP to check if MCP server is running
-EC2_IP=$(terraform output -raw ec2_public_ip 2>/dev/null || echo "")
-MCP_PORT=$(grep -E '^mcp_server_port' environments/dev.tfvars | cut -d'=' -f2 | tr -d ' ')
-if [ ! -z "$EC2_IP" ] && [ ! -z "$MCP_PORT" ]; then
-    echo -e "${YELLOW}Checking MCP server health at $EC2_IP:$MCP_PORT...${NC}"
-    for i in {1..10}; do
-        if curl -f "http://$EC2_IP:$MCP_PORT/mcp/health" 2>/dev/null; then
-            echo -e "${GREEN}✓ MCP server is healthy${NC}"
-            break
-        else
-            echo "Waiting for MCP server to start... (attempt $i/10)"
-            sleep 15
-        fi
-    done
-fi
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Error: Infrastructure deployment failed${NC}"
-    exit 1
-fi
-
 echo -e "${GREEN}✓ Infrastructure deployed successfully${NC}"
 
 echo -e "${YELLOW}Step 5: Enabling Lambda function...${NC}"

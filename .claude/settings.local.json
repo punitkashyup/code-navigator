@@ -30,7 +30,8 @@
       "Bash(mv:*)",
       "Bash(sed:*)",
       "Bash(bash:*)",
-      "Bash(./deploy.sh)"
+      "Bash(./deploy.sh)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

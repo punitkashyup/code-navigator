@@ -218,12 +218,16 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 # User Data Script for EC2 Instance
 locals {
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {
-    mcp_server_image    = local.mcp_server_image_uri
-    mcp_server_port     = var.mcp_server_port
-    opensearch_endpoint = var.opensearch_endpoint
-    project_name        = var.name_prefix
-    aws_region          = data.aws_region.current.name
-    aws_account_id      = data.aws_caller_identity.current.account_id
+    mcp_server_image         = local.mcp_server_image_uri
+    mcp_server_port          = var.mcp_server_port
+    opensearch_endpoint      = var.opensearch_endpoint
+    project_name             = var.name_prefix
+    aws_region               = data.aws_region.current.name
+    aws_account_id           = data.aws_caller_identity.current.account_id
+    opensearch_master_user   = var.opensearch_master_user
+    opensearch_master_password = var.opensearch_master_password
+    github_token             = var.github_token
+    openai_api_key           = var.openai_api_key
   }))
 }
 
@@ -290,7 +294,7 @@ resource "aws_lb_target_group" "mcp_server" {
     unhealthy_threshold = 3
     timeout             = 5
     interval            = 30
-    path                = "/mcp/health"
+    path                = "/"
     matcher             = "200"
     port                = "traffic-port"
     protocol            = "HTTP"

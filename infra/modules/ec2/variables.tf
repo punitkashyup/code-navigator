@@ -63,3 +63,40 @@ variable "auto_build_docker" {
   type        = bool
   default     = false
 }
+
+# MCP Server Environment Variables
+variable "opensearch_master_user" {
+  description = "OpenSearch master user"
+  type        = string
+  default     = "admin"
+}
+
+variable "opensearch_master_password" {
+  description = "OpenSearch master password"
+  type        = string
+  sensitive   = true
+}
+
+variable "github_token" {
+  description = "GitHub personal access token"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "openai_api_key" {
+  description = "OpenAI API key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+}
+
+variable "aws_account_id" {
+  description = "AWS account ID"
+  type        = string
+}
