@@ -78,6 +78,16 @@ output "ecr_repository_name" {
   value       = module.lambda.ecr_repository_name
 }
 
+output "mcp_ecr_repository_url" {
+  description = "URL of the ECR repository for MCP Server container"
+  value       = module.ec2.mcp_ecr_repository_url
+}
+
+output "mcp_ecr_repository_name" {
+  description = "Name of the MCP Server ECR repository"
+  value       = module.ec2.mcp_ecr_repository_name
+}
+
 # OpenSearch Outputs
 output "opensearch_endpoint" {
   description = "OpenSearch domain endpoint"

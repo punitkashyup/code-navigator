@@ -57,3 +57,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "auto_build_docker" {
+  description = "Whether to automatically build and push MCP Server Docker image during deployment"
+  type        = bool
+  default     = false
+}

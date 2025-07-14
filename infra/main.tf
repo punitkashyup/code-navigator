@@ -36,9 +36,6 @@ locals {
   }
   
   name_prefix = "${var.project_name}-${terraform.workspace}"
-  
-  # Control Lambda integration - enable when Lambda function is created
-  enable_lambda_integration = var.enable_lambda_creation
 }
 
 # VPC and Networking
@@ -82,6 +79,9 @@ module "ec2" {
   mcp_server_port      = var.mcp_server_port
   opensearch_endpoint  = module.opensearch.endpoint
   
+  # Docker build automation
+  auto_build_docker = var.auto_build_docker
+  
   tags = local.common_tags
 }
 
@@ -96,8 +96,6 @@ module "alb" {
   
   # Target groups
   mcp_server_target_group_arn = module.ec2.target_group_arn
-  webhook_lambda_arn         = module.lambda.webhook_function_arn
-  enable_lambda_integration  = local.enable_lambda_integration
   
   # SSL/TLS
   domain_name        = var.domain_name

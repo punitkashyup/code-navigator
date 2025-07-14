@@ -13,10 +13,7 @@ output "arn" {
   value       = aws_lb.main.arn
 }
 
-output "webhook_target_group_arn" {
-  description = "ARN of the webhook target group"
-  value       = aws_lb_target_group.webhook.arn
-}
+# Webhook target group removed - webhooks use API Gateway directly
 
 output "certificate_arn" {
   description = "ARN of the SSL certificate (if created)"
@@ -33,7 +30,4 @@ output "mcp_server_url" {
   value       = var.domain_name != "" ? "https://${var.domain_name}/mcp" : "http://${aws_lb.main.dns_name}/mcp"
 }
 
-output "webhook_url" {
-  description = "URL for webhook endpoint"
-  value       = var.domain_name != "" ? "https://${var.domain_name}/webhook" : "http://${aws_lb.main.dns_name}/webhook"
-}
+# Webhook URL removed - use API Gateway webhook endpoint instead

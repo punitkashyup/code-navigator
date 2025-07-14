@@ -102,77 +102,11 @@ resource "aws_lb_listener_rule" "mcp_server_http" {
   tags = var.tags
 }
 
-# Lambda Target Group for Webhook
-resource "aws_lb_target_group" "webhook" {
-  name        = "${var.name_prefix}-webhook"
-  target_type = "lambda"
+# Note: Lambda functions use API Gateway, not ALB
+# ALB is only for the MCP Server EC2 instance
 
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-webhook-tg"
-  })
-}
-
-# Lambda Target Group Attachment
-resource "aws_lb_target_group_attachment" "webhook" {
-  count = var.enable_lambda_integration ? 1 : 0
-  
-  target_group_arn = aws_lb_target_group.webhook.arn
-  target_id        = var.webhook_lambda_arn
-  depends_on       = [aws_lambda_permission.alb_invoke]
-}
-
-# Lambda Permission for ALB
-resource "aws_lambda_permission" "alb_invoke" {
-  count = var.enable_lambda_integration ? 1 : 0
-  
-  statement_id  = "AllowExecutionFromALB"
-  action        = "lambda:InvokeFunction"
-  function_name = var.webhook_lambda_arn
-  principal     = "elasticloadbalancing.amazonaws.com"
-  source_arn    = aws_lb_target_group.webhook.arn
-}
-
-# Listener Rule for Webhook
-resource "aws_lb_listener_rule" "webhook" {
-  count = var.certificate_arn != "" ? 1 : 0
-
-  listener_arn = aws_lb_listener.https[0].arn
-  priority     = 200
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.webhook.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/webhook", "/webhook/*"]
-    }
-  }
-
-  tags = var.tags
-}
-
-# Listener Rule for Webhook (HTTP)
-resource "aws_lb_listener_rule" "webhook_http" {
-  count = var.certificate_arn == "" ? 1 : 0
-
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 200
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.webhook.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/webhook", "/webhook/*"]
-    }
-  }
-
-  tags = var.tags
-}
+# Webhook endpoints are handled by API Gateway, not ALB
+# ALB only handles MCP Server traffic
 
 # Route 53 Record (if domain name is provided)
 data "aws_route53_zone" "main" {

@@ -266,7 +266,7 @@ resource "aws_lambda_function" "webhook" {
 
 # CloudWatch Log Group for Lambda
 resource "aws_cloudwatch_log_group" "lambda_logs" {
-  name              = "/aws/lambda/${length(aws_lambda_function.webhook) > 0 ? aws_lambda_function.webhook[0].function_name : "${var.name_prefix}-webhook-handler"}"
+  name              = "/aws/lambda/${var.name_prefix}-webhook-handler"
   retention_in_days = 7
 
   tags = var.tags

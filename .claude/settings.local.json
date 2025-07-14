@@ -25,7 +25,11 @@
       "Bash(terraform state rm:*)",
       "Bash(terraform state:*)",
       "Bash(terraform destroy:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(mv:*)",
+      "Bash(sed:*)",
+      "Bash(bash:*)"
     ],
     "deny": []
   }

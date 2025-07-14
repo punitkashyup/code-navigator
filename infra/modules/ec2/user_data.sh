@@ -91,6 +91,12 @@ EOF
 # Start CloudWatch Agent
 /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
 
+# Authenticate Docker to ECR if using ECR image
+if [[ "${mcp_server_image}" == *".dkr.ecr."* ]]; then
+    echo "Authenticating Docker to ECR for ${mcp_server_image}..."
+    aws ecr get-login-password --region ${aws_region} | docker login --username AWS --password-stdin ${aws_account_id}.dkr.ecr.${aws_region}.amazonaws.com
+fi
+
 # Create application directory
 mkdir -p /opt/mcp-server
 cd /opt/mcp-server
