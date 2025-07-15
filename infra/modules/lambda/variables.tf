@@ -55,6 +55,12 @@ variable "openai_api_key" {
   default     = ""
 }
 
+variable "mcp_api_key" {
+  description = "MCP Server API key"
+  type        = string
+  sensitive   = true
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

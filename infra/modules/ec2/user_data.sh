@@ -135,6 +135,7 @@ services:
       - CHUNKER_COALESCE=$${CHUNKER_COALESCE}
       - GENERATE_AI_DESCRIPTIONS=$${GENERATE_AI_DESCRIPTIONS}
       - CHUNK_DESC_PROVIDER=$${CHUNK_DESC_PROVIDER}
+      - MCP_API_KEY=$${MCP_API_KEY}
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${mcp_server_port}/"]
@@ -174,6 +175,9 @@ CHUNKER_MAX_CHARS=1500
 CHUNKER_COALESCE=200
 GENERATE_AI_DESCRIPTIONS=true
 CHUNK_DESC_PROVIDER=openai
+
+# MCP Server Configuration
+MCP_API_KEY=${mcp_api_key}
 EOF
 
 # Start MCP server with Docker Compose

@@ -31,7 +31,8 @@
       "Bash(sed:*)",
       "Bash(bash:*)",
       "Bash(./deploy.sh)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

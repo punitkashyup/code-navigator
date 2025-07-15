@@ -65,6 +65,9 @@ HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8080"))
 LOG_LEVEL_UVICORN = os.getenv("LOG_LEVEL_UVICORN", "info")
 
+# MCP Server API Key
+MCP_API_KEY = os.getenv("MCP_API_KEY", "1234")
+
 # ========================================
 # METADATA STRUCTURE HINT
 # ========================================

@@ -126,6 +126,12 @@ variable "openai_api_key" {
   default     = ""
 }
 
+variable "mcp_api_key" {
+  description = "MCP Server API key"
+  type        = string
+  sensitive   = true
+}
+
 variable "auto_build_docker" {
   description = "Whether to automatically build and push Docker image during deployment"
   type        = bool

@@ -87,6 +87,7 @@ module "ec2" {
   opensearch_master_password = var.opensearch_master_password
   github_token               = var.github_token
   openai_api_key             = var.openai_api_key
+  mcp_api_key                = var.mcp_api_key
   aws_region                 = data.aws_region.current.name
   aws_account_id             = data.aws_caller_identity.current.account_id
   
@@ -128,6 +129,7 @@ module "lambda" {
   github_webhook_secret = var.github_webhook_secret
   github_token         = var.github_token
   openai_api_key      = var.openai_api_key
+  mcp_api_key         = var.mcp_api_key
   
   # Docker build automation
   auto_build_docker = var.auto_build_docker

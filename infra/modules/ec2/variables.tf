@@ -91,6 +91,12 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
+variable "mcp_api_key" {
+  description = "MCP Server API key"
+  type        = string
+  sensitive   = true
+}
+
 variable "aws_region" {
   description = "AWS region"
   type        = string

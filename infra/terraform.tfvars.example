@@ -1,0 +1,39 @@
+# Example Terraform Variables Configuration
+# Copy this file to terraform.tfvars and update with your values
+
+# Project Configuration
+project_name = "code-navigator"
+aws_region   = "us-east-1"
+
+# VPC Configuration
+vpc_cidr            = "10.0.0.0/16"
+availability_zones  = ["us-east-1a", "us-east-1b"]
+public_subnets      = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnets     = ["10.0.3.0/24", "10.0.4.0/24"]
+
+# EC2 Configuration
+ec2_instance_type   = "t3.medium"
+ec2_key_name        = ""  # Optional: Set this to your EC2 key pair name
+mcp_server_image    = "your-account-id.dkr.ecr.us-east-1.amazonaws.com/code-navigator-mcp-server:latest"
+mcp_server_port     = 8080
+
+# Load Balancer Configuration
+domain_name     = ""  # Optional: Set this to your domain name (e.g., "api.example.com")
+certificate_arn = ""  # Optional: Set this to your ACM certificate ARN
+
+# OpenSearch Configuration
+opensearch_instance_type  = "t3.small.search"
+opensearch_instance_count = 1
+opensearch_volume_size    = 20
+opensearch_master_user    = "admin"
+opensearch_master_password = "ChangeThisSecurePassword123!"  # REQUIRED: Change this to a secure password
+
+# API Keys and Secrets (REQUIRED)
+github_webhook_secret = "your-github-webhook-secret-here"     # REQUIRED: GitHub webhook secret
+github_token         = "github_pat_your_token_here"          # Optional: GitHub personal access token
+openai_api_key       = "sk-your-openai-api-key-here"         # Optional: OpenAI API key
+mcp_api_key          = "1234"                                 # REQUIRED: MCP Server API key
+
+# Build and Deployment Configuration
+auto_build_docker      = false  # Set to true to automatically build and push Docker image
+enable_lambda_creation = false  # Set to true after Docker image is built and pushed

@@ -228,6 +228,7 @@ locals {
     opensearch_master_password = var.opensearch_master_password
     github_token             = var.github_token
     openai_api_key           = var.openai_api_key
+    mcp_api_key              = var.mcp_api_key
   }))
 }
 

@@ -28,6 +28,7 @@ services:
       - HOST=${HOST:-0.0.0.0}
       - PORT=${PORT:-8080}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - MCP_API_KEY=${MCP_API_KEY:-1234}
     # depends_on:
     #   opensearch-init:
     #     condition: service_completed_successfully

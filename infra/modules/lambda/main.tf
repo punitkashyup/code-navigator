@@ -241,6 +241,7 @@ resource "aws_lambda_function" "webhook" {
       GITHUB_WEBHOOK_SECRET    = var.github_webhook_secret
       GITHUB_TOKEN             = var.github_token
       OPENAI_API_KEY           = var.openai_api_key
+      MCP_API_KEY              = var.mcp_api_key
       CHUNKER_MAX_CHARS        = "1500"
       CHUNKER_COALESCE         = "200"
       GENERATE_AI_DESCRIPTIONS = "true"
